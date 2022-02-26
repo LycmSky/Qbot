@@ -1,5 +1,7 @@
 import asyncio
 
+from graia.ariadne import get_running
+from graia.ariadne.adapter import Adapter
 from graia.ariadne.app import Ariadne
 from graia.ariadne.event.message import FriendMessage
 from graia.ariadne.message.chain import MessageChain
