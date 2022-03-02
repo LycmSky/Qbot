@@ -1,4 +1,5 @@
 import json, re
+import database
 from graia.broadcast.interrupt.waiter import Waiter
 from graia.ariadne.message.parser.base import MatchContent
 from graia.ariadne import get_running
@@ -12,6 +13,8 @@ from graia.saya import Channel
 from graia.saya.builtins.broadcast.schema import ListenerSchema
 from distutils.log import info
 from aip import AipImageClassify
+from graia.broadcast.builtin.decorators import Depend
+from graia.broadcast.exceptions import ExecutionStop
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
@@ -24,15 +27,35 @@ with open("./modules/ImageClassify/config.json",'r') as load_f:
     datainfo = json.load(load_f)
 client = AipImageClassify(datainfo['APP_ID'], datainfo['API_KEY'], datainfo['SECRET_KEY'])
 
-print ('aaa')
+# 链接数据库
+db = database.databaseInit('mods')
+
+# 条件筛选
+# 判断是否开启
+def check_state():
+    async def check_state_deco(app: Ariadne):
+        if not db.find_one({"name": "ImageClassify"})["enabled"]:
+            raise ExecutionStop
+    return Depend(check_state_deco)
+
+def check_blacklist():
+    async def check_blacklist_deco(app: Ariadne, group: Group, member: Member):
+        checkGroup = group.id in db.find_one({"name": "ImageClassify"})["groupBlackList"]
+        checkmMmber = member.id in db.find_one({"name": "ImageClassify"})["friendBlackList"]
+        if checkGroup or checkmMmber:
+            raise ExecutionStop
+    return Depend(check_blacklist_deco)
 
 # 创建消息处理器，接收群消息中的 .识图 命令
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[MatchContent(".识图")]
+    decorators=[
+        MatchContent(".识图"),
+        check_state(),
+        check_blacklist()
+        ]
 ))
 async def imageClassify(app: Ariadne, group: Group, member: Member, message: MessageChain):
-    print ('bbb')
     inc = InterruptControl(app.broadcast) # 创建实例
     await app.sendGroupMessage(group, MessageChain.create('请发送图片'))
     # 交互等待函数
