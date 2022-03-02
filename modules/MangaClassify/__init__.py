@@ -1,4 +1,4 @@
-import json, re
+import re
 from graia.broadcast.interrupt.waiter import Waiter
 from graia.ariadne.message.parser.base import MatchContent
 from graia.ariadne import get_running
@@ -8,31 +8,26 @@ from graia.ariadne.event.message import GroupMessage
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Member
 from graia.broadcast.interrupt import InterruptControl
+from graia.ariadne.message.element import Image
 from graia.saya import Channel
 from graia.saya.builtins.broadcast.schema import ListenerSchema
 from distutils.log import info
-from aip import AipImageClassify
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
-channel.name("识图")
-channel.description("通过百度api识别图片")
+channel.name("识番")
+channel.description("trace.moe api 识别番剧")
 channel.author("Lycm")
 
-# 读取配置文件，获取百度开放平台api创建实例
-with open("./modules/ImageClassify/config.json",'r') as load_f:
-    datainfo = json.load(load_f)
-client = AipImageClassify(datainfo['APP_ID'], datainfo['API_KEY'], datainfo['SECRET_KEY'])
+# 设置api地址
+url = "https://api.trace.moe/search?cutBorders&url={}"
 
-print ('aaa')
-
-# 创建消息处理器，接收群消息中的 .识图 命令
+# 创建消息处理器，接收群消息中的 .识番 命令
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[MatchContent(".识图")]
+    decorators=[MatchContent(".识番")]
 ))
 async def imageClassify(app: Ariadne, group: Group, member: Member, message: MessageChain):
-    print ('bbb')
     inc = InterruptControl(app.broadcast) # 创建实例
     await app.sendGroupMessage(group, MessageChain.create('请发送图片'))
     # 交互等待函数
@@ -45,13 +40,20 @@ async def imageClassify(app: Ariadne, group: Group, member: Member, message: Mes
     # 处理图片消息，获取图片的url
     imginfo = await inc.wait(waiter)
     imgurl = re.findall(r'"url":"(.*?)"', imginfo.asPersistentString())[0]
-    # 通过图片url获取图片二进制编码，并传入识图实例
+    # 拼接url并发起请求，返回json格式数据
     session = get_running(Adapter).session
-    async with session.get(imgurl) as r:
-        imgBase = await r.read()
-        info = client.advancedGeneral(imgBase)['result'][0]
-        responseMsg = f'''图片识别结果:
-        关键词：{info['keyword']}
-        准确度：{info['score']*100}%
-        标  签：{info['root']}'''
-    await app.sendGroupMessage(group, MessageChain.create(responseMsg))
+    async with session.get(url.format(imgurl)) as r:
+            ret = await r.json()
+    ret = ret["result"][0]
+
+    # 格式化信息
+    responseMsg = f'''番剧识别结果:
+    番剧名：{ret["filename"]}
+    准确度：{int(ret["similarity"]*100)}%
+    集  数：{ret["episode"]}
+    时  间：{int(ret["from"]//60)}分{int(ret["from"]%60)}秒 - {int(ret["to"]//60)}分{int(ret["to"]%60)}秒
+    参考图：'''
+    # 发送结果
+    await app.sendGroupMessage(group, MessageChain.create(responseMsg, Image(url=ret['image'])))
+
+
