@@ -1,6 +1,5 @@
 import json, re
-from tokenize import group
-import database
+import database, criteria
 from graia.broadcast.interrupt.waiter import Waiter
 from graia.ariadne.message.parser.base import MatchContent, DetectPrefix, ContainKeyword
 from graia.ariadne import get_running
@@ -12,11 +11,8 @@ from graia.ariadne.model import Group, Member
 from graia.broadcast.interrupt import InterruptControl
 from graia.saya import Channel
 from graia.saya.builtins.broadcast.schema import ListenerSchema
-from distutils.log import info
 from aip import AipImageClassify
-from graia.broadcast.builtin.decorators import Depend
-from graia.broadcast.exceptions import ExecutionStop
-from graia.ariadne.message.element import Plain
+
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
@@ -31,37 +27,14 @@ client = AipImageClassify(datainfo['APP_ID'], datainfo['API_KEY'], datainfo['SEC
 
 # 链接数据库
 mods = database.databaseInit('mods')
-groups = database.databaseInit('groups')
-
-# 条件筛选
-# 判断是否开启
-def check_state():
-    async def check_state_deco(app: Ariadne):
-        if not mods.find_one({"name": "ImageClassify"})["enabled"]:
-            raise ExecutionStop
-    return Depend(check_state_deco)
-
-def check_blacklist():
-    async def check_blacklist_deco(app: Ariadne, group: Group, member: Member):
-        checkGroup = group.id in mods.find_one({"name": "ImageClassify"})["groupBlackList"]
-        checkmMmber = member.id in mods.find_one({"name": "ImageClassify"})["friendBlackList"]
-        if checkGroup or checkmMmber:
-            raise ExecutionStop
-    return Depend(check_blacklist_deco)
-
-def check_admin():
-    async def check_admin_deco(app: Ariadne, group: Group, member: Member):
-        if member.id not in groups.find_one({"groupId": group.id})['groupAdmin']:
-            raise ExecutionStop
-    return Depend(check_admin_deco)
 
 # 创建消息处理器，接收群消息中的 .识图 命令
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
     decorators=[
         MatchContent(".识图"),
-        check_state(),
-        check_blacklist()]
+        criteria.check_mod_state("ImageClassify"),
+        criteria.check_mod_blacklist("ImageClassify")]
 ))
 async def imageClassify(app: Ariadne, group: Group, member: Member, message: MessageChain):
     inc = InterruptControl(app.broadcast) # 创建实例
@@ -90,7 +63,7 @@ async def imageClassify(app: Ariadne, group: Group, member: Member, message: Mes
 # 启用模组
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-开启"), check_admin()]))
+    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-开启"), criteria.check_group_admin()]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
     mods.update_one({"name": "ImageClassify"}, {"$set": {"enabled": True}})
     await app.sendGroupMessage(group, MessageChain.create('已开启识图功能'))
@@ -98,7 +71,7 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
 # 停用模组
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-关闭"), check_state(), check_admin()]))
+    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-关闭"), criteria.check_mod_state("ImageClassify"), criteria.check_group_admin()]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
     mods.update_one({"name": "ImageClassify"}, {"$set": {"enabled": False}})
     await app.sendGroupMessage(group, MessageChain.create('已关闭识图功能'))
@@ -106,28 +79,28 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
 # 将用户加入黑名单
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-拉黑"), check_state(), check_admin()]))
+    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-拉黑"), criteria.check_mod_state("ImageClassify"), criteria.check_group_admin()]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
     print (message.asDisplay())
     userId = int(re.search(r'-拉黑 @?(\d+)', message.asDisplay()).group(1))
-    friendBlackList = mods.find_one({"name": "ImageClassify"})['friendBlackList']
-    if friendBlackList.count(userId):
-        await app.sendGroupMessage(group, MessageChain.create('这家伙早就已经被拉黑了！'))
+    blackList = mods.find_one({"name": "ImageClassify"})['blackList']
+    if blackList.count(userId):
+        await app.sendGroupMessage(group, MessageChain.create(f'{userId}已在黑名单中'))
     else:
-        friendBlackList.append(userId)
-        mods.update_one({"name": "ImageClassify"}, {"$set": {"friendBlackList": friendBlackList}})
+        blackList.append(userId)
+        mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
         await app.sendGroupMessage(group, MessageChain.create(f'已将{userId}加入黑名单！'))
 
 # 将用户移出黑名单
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-取消拉黑"), check_state(), check_admin()]))
+    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-取消拉黑"), criteria.check_mod_state("ImageClassify"), criteria.check_group_admin()]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
     userId = int(re.search(r'-取消拉黑 @?(\d+)', message.asDisplay()).group(1))
-    friendBlackList = mods.find_one({"name": "ImageClassify"})['friendBlackList']
-    if friendBlackList.count(userId):
-        friendBlackList.remove(userId)
-        mods.update_one({"name": "ImageClassify"}, {"$set": {"friendBlackList": friendBlackList}})
+    blackList = mods.find_one({"name": "ImageClassify"})['blackList']
+    if blackList.count(userId):
+        blackList.remove(userId)
+        mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
         await app.sendGroupMessage(group, MessageChain.create(f'已将{userId}移出黑名单！'))
     else:
-        await app.sendGroupMessage(group, MessageChain.create('小黑屋里没有这个人哦~'))
+        await app.sendGroupMessage(group, MessageChain.create(f'黑名单中不存在{userId}'))
