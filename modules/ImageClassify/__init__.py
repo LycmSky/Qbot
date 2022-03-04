@@ -63,23 +63,40 @@ async def imageClassify(app: Ariadne, group: Group, member: Member, message: Mes
 # 启用模组
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-开启"), criteria.check_group_admin()]))
+    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-开启"), criteria.check_group_admin(), criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
-    mods.update_one({"name": "ImageClassify"}, {"$set": {"enabled": True}})
-    await app.sendGroupMessage(group, MessageChain.create('已开启识图功能'))
+    blackList = mods.find_one({"name": "ImageClassify"})['blackList']
+    if blackList.count(group.id):
+        blackList.remove(group.id)
+        mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
+        await app.sendGroupMessage(group, MessageChain.create('已开启识图功能'))
+    else:
+        await app.sendGroupMessage(group, MessageChain.create('要开启的话得先关闭哦~'))
 
 # 停用模组
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-关闭"), criteria.check_mod_state("ImageClassify"), criteria.check_group_admin()]))
+    decorators=[
+        DetectPrefix(".识图"), 
+        ContainKeyword(keyword="-关闭"), 
+        criteria.check_group_admin(), 
+        criteria.check_mod_blacklist("ImageClassify"),
+        criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
-    mods.update_one({"name": "ImageClassify"}, {"$set": {"enabled": False}})
+    blackList = mods.find_one({"name": "ImageClassify"})['blackList']
+    blackList.append(group.id)
+    mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
     await app.sendGroupMessage(group, MessageChain.create('已关闭识图功能'))
 
 # 将用户加入黑名单
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-拉黑"), criteria.check_mod_state("ImageClassify"), criteria.check_group_admin()]))
+    decorators=[
+        DetectPrefix(".识图"), 
+        ContainKeyword(keyword="-拉黑"), 
+        criteria.check_group_admin(),
+        criteria.check_mod_blacklist("ImageClassify"),
+        criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
     print (message.asDisplay())
     userId = int(re.search(r'-拉黑 @?(\d+)', message.asDisplay()).group(1))
@@ -94,7 +111,13 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
 # 将用户移出黑名单
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-取消拉黑"), criteria.check_mod_state("ImageClassify"), criteria.check_group_admin()]))
+    decorators=[
+        DetectPrefix(".识图"), 
+        ContainKeyword(keyword="-取消拉黑"), 
+        criteria.check_mod_state("ImageClassify"), 
+        criteria.check_group_admin(),
+        criteria.check_mod_blacklist("ImageClassify"),
+        criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
     userId = int(re.search(r'-取消拉黑 @?(\d+)', message.asDisplay()).group(1))
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
