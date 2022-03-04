@@ -63,7 +63,11 @@ async def imageClassify(app: Ariadne, group: Group, member: Member, message: Mes
 # 启用模组
 @channel.use(ListenerSchema(
     listening_events=[GroupMessage], 
-    decorators=[DetectPrefix(".识图"), ContainKeyword(keyword="-开启"), criteria.check_group_admin(), criteria.check_mod_state("ImageClassify")]))
+    decorators=[
+        DetectPrefix(".识图"), 
+        ContainKeyword(keyword="-开启"), 
+        criteria.check_group_admin(), 
+        criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
     if blackList.count(group.id):
@@ -98,15 +102,11 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
         criteria.check_mod_blacklist("ImageClassify"),
         criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
-    print (message.asDisplay())
-    userId = int(re.search(r'-拉黑 @?(\d+)', message.asDisplay()).group(1))
+    userId = list(map(lambda x: int(x), re.findall(r'@(\d+)', message.asDisplay())))
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
-    if blackList.count(userId):
-        await app.sendGroupMessage(group, MessageChain.create(f'{userId}已在黑名单中'))
-    else:
-        blackList.append(userId)
-        mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
-        await app.sendGroupMessage(group, MessageChain.create(f'已将{userId}加入黑名单！'))
+    blackList = list(set(blackList +  userId))
+    mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
+    await app.sendGroupMessage(group, MessageChain.create(f'已将{userId}加入黑名单！'))
 
 # 将用户移出黑名单
 @channel.use(ListenerSchema(
@@ -119,11 +119,8 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
         criteria.check_mod_blacklist("ImageClassify"),
         criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
-    userId = int(re.search(r'-取消拉黑 @?(\d+)', message.asDisplay()).group(1))
+    userId = list(map(lambda x: int(x), re.findall(r'@(\d+)', message.asDisplay())))
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
-    if blackList.count(userId):
-        blackList.remove(userId)
-        mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
-        await app.sendGroupMessage(group, MessageChain.create(f'已将{userId}移出黑名单！'))
-    else:
-        await app.sendGroupMessage(group, MessageChain.create(f'黑名单中不存在{userId}'))
+    blackList = list(set(blackList) -  set(userId))
+    mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
+    await app.sendGroupMessage(group, MessageChain.create(f'已将{userId}移出黑名单！'))
