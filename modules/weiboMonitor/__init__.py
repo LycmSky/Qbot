@@ -40,6 +40,7 @@ if mods.find_one({"name": "weiboMonitor"}) == None:
         "enabled": True,
         "blackList": [],
         "whiteList": [],
+        "blogList": [],
         "target": {},
         "data": {}
         })
