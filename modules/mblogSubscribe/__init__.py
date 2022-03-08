@@ -5,8 +5,8 @@ from functools import reduce
 from graia.saya import Channel
 from graia.saya.builtins.broadcast.schema import ListenerSchema
 from graia.scheduler.saya import GraiaSchedulerBehaviour, SchedulerSchema
-from graia.ariadne.model import Group, Member
-from graia.ariadne.event.message import GroupMessage
+from graia.ariadne.model import Group, Member, Friend
+from graia.ariadne.event.message import GroupMessage, FriendMessage
 from graia.ariadne.message.parser.base import MatchContent
 from graia.ariadne.app import Ariadne
 from graia.ariadne import get_running
@@ -34,9 +34,9 @@ channel.author("Lycm")
 
 # 初始化数据库
 mods = database.databaseInit('mods')
-if mods.find_one({"name": "weiboMonitor"}) == None:
+if mods.find_one({"name": "mblogSubscribe"}) == None:
     mods.insert_one({
-        "name": "weiboMonitor",
+        "name": "mblogSubscribe",
         "enabled": True,
         "blackList": [],
         "whiteList": [],
@@ -52,9 +52,10 @@ header = '''{}
 footer = '''
 原帖链接：{}'''
 
-@channel.use(SchedulerSchema(timer=timers.every_minute()))
+@channel.use(
+    SchedulerSchema(timer=timers.every_minute()))
 async def scheduled_func(app: Ariadne):
-    for group,  uidList in mods.find_one({"name": "weiboMonitor"})['target'].items():
+    for group,  uidList in mods.find_one({"name": "mblogSubscribe"})['target'].items():
         for uid in uidList:
             imgurl = (f"https://m.weibo.cn/api/container/getIndex?&containerid=107603{uid}")
             session = get_running(Adapter).session
@@ -67,7 +68,7 @@ async def scheduled_func(app: Ariadne):
                 created_at = mblog['created_at']
                 id = mblog['id']
 
-            blogList = mods.find_one({"name": "weiboMonitor"})['blogList']
+            blogList = mods.find_one({"name": "mblogSubscribe"})['blogList']
             if id not in blogList:
                 response_header = header.format(datetime.strptime(created_at, '%a %b %d %H:%M:%S +0800 %Y'), screen_name, uid, text)
                 response_footer = footer.format(scheme)
@@ -78,10 +79,10 @@ async def scheduled_func(app: Ariadne):
                 else:
                     await app.sendGroupMessage(int(group), MessageChain.create(response_header+response_footer))
                 blogList.append(id)
-                data = mods.find_one({"name": "weiboMonitor"})['data']
+                data = mods.find_one({"name": "mblogSubscribe"})['data']
                 data[id] = {"uid": uid,
                     "screen_name": screen_name,
                     "created_at": created_at,
                     "text": text,
                     "scheme": scheme}
-                mods.update_one({"name": "weiboMonitor"}, {"$set": {"blogList": blogList,"data": data}})
+                mods.update_one({"name": "mblogSubscribe"}, {"$set": {"blogList": blogList,"data": data}})

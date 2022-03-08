@@ -12,7 +12,9 @@ from graia.broadcast.interrupt import InterruptControl
 from graia.saya import Channel
 from graia.saya.builtins.broadcast.schema import ListenerSchema
 from aip import AipImageClassify
-
+from graia.broadcast.exceptions import ExecutionStop
+from graia.ariadne.message.commander import Commander, Slot, Arg
+from graia.ariadne.message.commander.saya import CommanderBehaviour, CommandSchema
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
@@ -27,9 +29,18 @@ client = AipImageClassify(datainfo['APP_ID'], datainfo['API_KEY'], datainfo['SEC
 
 # 链接数据库
 mods = database.databaseInit('mods')
+if mods.find_one({"name": "ImageClassify"}) == None:
+    mods.insert_one({
+        "name": "ImageClassify",
+        "enabled": True,
+        "blackList": [],
+        "whiteList": [],
+        })
+
 
 # 创建消息处理器，接收群消息中的 .识图 命令
-@channel.use(ListenerSchema(
+@channel.use(
+    ListenerSchema(
     listening_events=[GroupMessage], 
     decorators=[
         MatchContent(".识图"),
@@ -37,6 +48,7 @@ mods = database.databaseInit('mods')
         criteria.check_mod_blacklist("ImageClassify")]
 ))
 async def imageClassify(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    print (member.permission)
     inc = InterruptControl(app.broadcast) # 创建实例
     await app.sendGroupMessage(group, MessageChain.create('请发送图片'))
     # 交互等待函数
@@ -66,9 +78,9 @@ async def imageClassify(app: Ariadne, group: Group, member: Member, message: Mes
     decorators=[
         DetectPrefix(".识图"), 
         ContainKeyword(keyword="-开启"), 
-        criteria.check_group_admin(), 
         criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
     if blackList.count(group.id):
         blackList.remove(group.id)
@@ -83,10 +95,10 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
     decorators=[
         DetectPrefix(".识图"), 
         ContainKeyword(keyword="-关闭"), 
-        criteria.check_group_admin(), 
         criteria.check_mod_blacklist("ImageClassify"),
         criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
     blackList.append(group.id)
     mods.update_one({"name": "ImageClassify"}, {"$set": {"blackList": blackList}})
@@ -98,10 +110,10 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
     decorators=[
         DetectPrefix(".识图"), 
         ContainKeyword(keyword="-拉黑"), 
-        criteria.check_group_admin(),
         criteria.check_mod_blacklist("ImageClassify"),
         criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     userId = list(map(lambda x: int(x), re.findall(r'@(\d+)', message.asDisplay())))
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
     blackList = list(set(blackList +  userId))
@@ -114,11 +126,10 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
     decorators=[
         DetectPrefix(".识图"), 
         ContainKeyword(keyword="-取消拉黑"), 
-        criteria.check_mod_state("ImageClassify"), 
-        criteria.check_group_admin(),
         criteria.check_mod_blacklist("ImageClassify"),
         criteria.check_mod_state("ImageClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     userId = list(map(lambda x: int(x), re.findall(r'@(\d+)', message.asDisplay())))
     blackList = mods.find_one({"name": "ImageClassify"})['blackList']
     blackList = list(set(blackList) -  set(userId))

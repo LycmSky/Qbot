@@ -12,6 +12,8 @@ from graia.broadcast.interrupt import InterruptControl
 from graia.ariadne.message.element import Image, Plain
 from graia.saya import Channel
 from graia.saya.builtins.broadcast.schema import ListenerSchema
+from graia.broadcast.exceptions import ExecutionStop
+from graia.ariadne.model import MiraiSession
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
@@ -21,6 +23,14 @@ channel.author("Lycm")
 
 # 链接数据库
 mods = database.databaseInit('mods')
+if mods.find_one({"name": "MangaClassify"}) == None:
+    mods.insert_one({
+        "name": "MangaClassify",
+        "enabled": True,
+        "blackList": [],
+        "whiteList": [],
+        })
+
 
 # 设置api地址
 url = "https://api.trace.moe/search?cutBorders&url={}"
@@ -67,9 +77,9 @@ async def mangaClassify(app: Ariadne, group: Group, member: Member, message: Mes
     decorators=[
         DetectPrefix(".识番"), 
         ContainKeyword(keyword="-开启"), 
-        criteria.check_group_admin(), 
         criteria.check_mod_state("MangaClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     blackList = mods.find_one({"name": "MangaClassify"})['blackList']
     if blackList.count(group.id):
         blackList.remove(group.id)
@@ -84,10 +94,10 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
     decorators=[
         DetectPrefix(".识番"),
         ContainKeyword(keyword="-关闭"), 
-        criteria.check_group_admin(), 
         criteria.check_mod_blacklist("MangaClassify"),
         criteria.check_mod_state("MangaClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     blackList = mods.find_one({"name": "MangaClassify"})['blackList']
     blackList.append(group.id)
     mods.update_one({"name": "MangaClassify"}, {"$set": {"blackList": blackList}})
@@ -99,10 +109,10 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
     decorators=[
         DetectPrefix(".识番"),
         ContainKeyword(keyword="-拉黑"), 
-        criteria.check_group_admin(),
         criteria.check_mod_blacklist("MangaClassify"),
         criteria.check_mod_state("MangaClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     userId = list(map(lambda x: int(x), re.findall(r'@(\d+)', message.asDisplay())))
     blackList = mods.find_one({"name": "MangaClassify"})['blackList']
     blackList = list(set(blackList +  userId))
@@ -115,11 +125,10 @@ async def control(app: Ariadne, group: Group, member: Member, message: MessageCh
     decorators=[
         DetectPrefix(".识番"), 
         ContainKeyword(keyword="-取消拉黑"), 
-        criteria.check_mod_state("MangaClassify"), 
-        criteria.check_group_admin(),
         criteria.check_mod_blacklist("MangaClassify"),
         criteria.check_mod_state("MangaClassify")]))
 async def control(app: Ariadne, group: Group, member: Member, message: MessageChain):
+    criteria.check_group_admin(member.permission)
     userId = list(map(lambda x: int(x), re.findall(r'@(\d+)', message.asDisplay())))
     blackList = mods.find_one({"name": "MangaClassify"})['blackList']
     blackList = list(set(blackList) -  set(userId))

@@ -22,9 +22,7 @@ def check_mod_blacklist(mod_name: str):
             raise ExecutionStop
     return Depend(check_blacklist_deco)
 
-def check_group_admin():
+def check_group_admin(permission):
     '''确认用户是否为该群管理员'''
-    async def check_admin_deco(app: Ariadne, group: Group, member: Member):
-        if member.id not in groups.find_one({"groupId": group.id})['groupAdmin']:
-            raise ExecutionStop
-    return Depend(check_admin_deco)
+    if str(permission) == "MEMBER":
+        raise ExecutionStop
