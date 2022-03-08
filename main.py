@@ -1,5 +1,5 @@
 import asyncio
-import os
+import os, json
 
 from graia.ariadne.app import Ariadne
 from graia.ariadne.model import MiraiSession
@@ -13,12 +13,16 @@ from graia.scheduler import timers
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.message.commander.saya import CommanderBehaviour, CommandSchema
 from graia.ariadne.message.commander import Commander, Slot, Arg
+
+with open("./config.json",'r') as load_f:
+    datainfo = json.load(load_f)['MiraiSession']
+
 # 创建 Ariadne 实例
 app = Ariadne(
     MiraiSession(
-        host="http://192.168.0.241:8080",
-        verify_key="ServiceVerifyKey",
-        account=3077500889,
+        host=datainfo['host'],
+        verify_key=datainfo['verify_key'],
+        account=datainfo['account'],
     ),
 )
 

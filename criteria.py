@@ -3,6 +3,7 @@ from graia.broadcast.exceptions import ExecutionStop
 from graia.ariadne.app import Ariadne
 from graia.ariadne.model import Group, Member
 import database
+from graia.ariadne.event.message import MessageEvent
 
 mods = database.databaseInit('mods')
 groups = database.databaseInit('groups')
@@ -16,9 +17,9 @@ def check_mod_state(mod_name: str):
 
 def check_mod_blacklist(mod_name: str):
     '''确认用户是否存在于模组黑名单'''
-    async def check_blacklist_deco(app: Ariadne, group: Group, member: Member):
+    async def check_blacklist_deco(app: Ariadne, event:MessageEvent):
         blacklist = mods.find_one({"name": mod_name})["blackList"]
-        if group.id in blacklist or member.id in blacklist:
+        if event.sender.id in blacklist:
             raise ExecutionStop
     return Depend(check_blacklist_deco)
 

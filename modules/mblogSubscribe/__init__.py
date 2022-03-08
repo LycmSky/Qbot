@@ -17,15 +17,6 @@ from graia.scheduler import GraiaScheduler
 from graia.scheduler import timers
 from graia.ariadne.model import MiraiSession
 
-
-# 创建 Ariadne 实例
-app = Ariadne(
-    MiraiSession(
-        host="http://localhost:8080",
-        verify_key="ServiceVerifyKey",
-        account=3077500889,
-    ),
-)
 # 获取插件实例，添加插件信息
 channel = Channel.current()
 channel.name("微博监控")
@@ -40,8 +31,7 @@ if mods.find_one({"name": "mblogSubscribe"}) == None:
         "enabled": True,
         "blackList": [],
         "whiteList": [],
-        "blogList": [],
-        "target": {},
+        "subscribe": {},
         "data": {}
         })
 
@@ -55,34 +45,36 @@ footer = '''
 @channel.use(
     SchedulerSchema(timer=timers.every_minute()))
 async def scheduled_func(app: Ariadne):
-    for group,  uidList in mods.find_one({"name": "mblogSubscribe"})['target'].items():
-        for uid in uidList:
-            imgurl = (f"https://m.weibo.cn/api/container/getIndex?&containerid=107603{uid}")
-            session = get_running(Adapter).session
-            async with session.get(imgurl) as r:
-                imgBase = await r.json()
-                mblog = imgBase['data']['cards'][0]['mblog']
-                text = re.sub(r'<[^>]+>', '', mblog['text'])
-                screen_name = mblog['user']['screen_name']
-                scheme = imgBase['data']['cards'][0]['scheme']
-                created_at = mblog['created_at']
-                id = mblog['id']
+    for uid,  subscribers in mods.find_one({"name": "mblogSubscribe"})['subscribe'].items():
+        mblogList = (f"https://m.weibo.cn/api/container/getIndex?&containerid=107603{uid}")
+        session = get_running(Adapter).session
+        async with session.get(mblogList) as r:
+            imgBase = await r.json()
+            mblog = imgBase['data']['cards'][0]['mblog']
+            text = re.sub(r'<[^>]+>', '', mblog['text'])
+            screen_name = mblog['user']['screen_name']
+            scheme = imgBase['data']['cards'][0]['scheme']
+            created_at = mblog['created_at']
+            id = mblog['id']
 
-            blogList = mods.find_one({"name": "mblogSubscribe"})['blogList']
-            if id not in blogList:
+        try:
+            mods.find_one({"name": "mblogSubscribe"})['data'][id]
+        except:
+            for subscriber, t in subscribers.items():
+                send = app.sendGroupMessage if t=="group" else app.sendFriendMessage
                 response_header = header.format(datetime.strptime(created_at, '%a %b %d %H:%M:%S +0800 %Y'), screen_name, uid, text)
                 response_footer = footer.format(scheme)
                 if mblog['pic_num']:
                     MessageChain_pic = map(lambda x: MessageChain.create(Image(url=x['url'])), mblog['pics'])
                     response = reduce(lambda x, y: x+y, MessageChain_pic, MessageChain.create(response_header))+response_footer
-                    await app.sendGroupMessage(int(group), response)
+                    await send(subscriber, response)
                 else:
-                    await app.sendGroupMessage(int(group), MessageChain.create(response_header+response_footer))
-                blogList.append(id)
+                    await send(subscriber, MessageChain.create(response_header+response_footer))
+
                 data = mods.find_one({"name": "mblogSubscribe"})['data']
                 data[id] = {"uid": uid,
                     "screen_name": screen_name,
                     "created_at": created_at,
                     "text": text,
                     "scheme": scheme}
-                mods.update_one({"name": "mblogSubscribe"}, {"$set": {"blogList": blogList,"data": data}})
+                mods.update_one({"name": "mblogSubscribe"}, {"$set": {"data": data}})
