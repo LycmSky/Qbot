@@ -57,9 +57,7 @@ class Filter:
 
     def _blacklist(self):
         '''确认用户是否存在于模组黑名单'''
-        print(2)
         blacklist = mods.find_one({"name": self.mod_name})["blackList"]
-        print(blacklist[str(self.event.sender.group.id)])
         if str(self.event.sender.group.id) in blacklist:
             if self.event.sender.id in blacklist[str(self.event.sender.group.id)]:
                 return False
