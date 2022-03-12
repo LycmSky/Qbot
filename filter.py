@@ -68,4 +68,4 @@ class Filter:
 
     def _admin(self):
         '''确认用户是否为该群管理员'''
-        return True if self.event.sender.permission != "MEMBER" else False
+        return True if str(self.event.sender.permission) != "MEMBER" else False
