@@ -1,6 +1,7 @@
 from datetime import datetime
 import database
 import re
+from filter import Filter
 from functools import reduce
 from graia.saya import Channel
 from graia.saya.builtins.broadcast.schema import ListenerSchema
@@ -16,6 +17,9 @@ from graia.ariadne.message.element import Image, Plain
 from graia.scheduler import GraiaScheduler
 from graia.scheduler import timers
 from graia.ariadne.model import MiraiSession
+from graia.ariadne.message.commander.saya import  CommandSchema
+from graia.ariadne.event.message import GroupMessage, FriendMessage, MessageEvent
+from graia.ariadne.message.commander import Commander, Slot, Arg
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
@@ -29,7 +33,10 @@ if mods.find_one({"name": "mblogSubscribe"}) == None:
     mods.insert_one({
         "name": "mblogSubscribe",
         "enabled": True,
-        "blackList": [],
+        "blackList": {
+            "Friends": [],
+            "Groups": []
+        },
         "whiteList": [],
         "subscribe": {},
         "data": {}
@@ -78,3 +85,82 @@ async def scheduled_func(app: Ariadne):
                     "text": text,
                     "scheme": scheme}
                 mods.update_one({"name": "mblogSubscribe"}, {"$set": {"data": data}})
+
+@channel.use(
+        CommandSchema(
+        "[.微博 | .mblog]",
+        {"open": Arg("[--on|-O|-开启]", bool, False), 
+        "close": Arg("[--off|-C|-关闭]", bool, False),
+        "nodisturb": Arg("[--nodis|-T|-勿扰] {}", str, ""),
+        "add": Arg("[--add|-A|-订阅] {}", str, ""),
+        "delete": Arg("[--del|-D|-取消订阅] {}", str, "")}))
+async def control(open, close, nodisturb, add, delete, app: Ariadne, event:MessageEvent, message: MessageChain):
+    blackList = mods.find_one({"name": "mblogSubscribe"})['blackList']
+    subscribe = mods.find_one({"name": "mblogSubscribe"})['subscribe']
+    filter = Filter(mod_name="mblogSubscribe", event=event).main
+    # 处理群组消息
+    if event.type=="GroupMessage":
+        groupId = event.sender.group.id
+        if open and filter(9): # 开启
+            if blackList['Groups'].count(groupId):
+                blackList['Groups'].remove(groupId)
+                await app.sendGroupMessage(groupId, MessageChain.create('已开启微博订阅功能'))
+
+        if close and filter(13): # 关闭
+            if not blackList['Groups'].count(groupId):
+                blackList['Groups'].append(groupId)
+                print (blackList['Groups'])
+                await app.sendGroupMessage(groupId, MessageChain.create('已关闭微博订阅功能'))
+
+        if add !="" and filter(13): # 订阅
+            userIds = re.findall(r'(\d+)', add)
+            for userId in userIds:
+                subscribe[userId] = subscribe[userId] if userId in subscribe else {}
+                subscribe[userId][str(groupId)] = "group"
+            await app.sendGroupMessage(groupId, MessageChain.create(f'已订阅{userIds}！'))
+
+        if delete !="" and filter(13): # 取消订阅
+            userIds = re.findall(r'(\d+)', delete)
+            for userId in userIds:
+                print (userId)
+                if userId in subscribe:
+                    if str(groupId) in subscribe[userId]:
+                        subscribe[userId].pop(str(groupId))
+                    if subscribe[userId]=={}:
+                        subscribe.pop(userId)
+            await app.sendGroupMessage(groupId, MessageChain.create(f'已取消订阅{userIds}！'))
+
+    # 处理好友消息
+    if event.type=="FriendMessage":
+        senderId = event.sender.id
+        if open and filter(8): # 开启
+            if blackList['Friends'].count(senderId):
+                blackList['Friends'].remove(senderId)
+                await app.sendFriendMessage(senderId, MessageChain.create('已开启微博订阅功能'))
+
+        if close and filter(12): # 关闭
+            if not blackList['Friends'].count(senderId):
+                blackList['Friends'].append(senderId)
+                print (blackList['Friends'])
+                await app.sendFriendMessage(senderId, MessageChain.create('已关闭微博订阅功能'))
+
+        if add !="" and filter(12): # 订阅
+            userIds = re.findall(r'(\d+)', add)
+            for userId in userIds:
+                subscribe[userId] = subscribe[userId] if userId in subscribe else {}
+                subscribe[userId][str(senderId)] = "friend"
+            await app.sendFriendMessage(senderId, MessageChain.create(f'已订阅{userIds}！'))
+
+        if delete !="" and filter(12): # 取消订阅
+            userIds = re.findall(r'(\d+)', delete)
+            for userId in userIds:
+                if userId in subscribe:
+                    if str(senderId) in subscribe[userId]:
+                        subscribe[userId].pop(str(senderId))
+                    if subscribe[userId]=={}:
+                        subscribe.pop(userId)
+            await app.sendFriendMessage(senderId, MessageChain.create(f'已取消订阅{userIds}！'))
+
+    mods.update_one({"name": "mblogSubscribe"}, {"$set": {"blackList": blackList}})
+    mods.update_one({"name": "mblogSubscribe"}, {"$set": {"subscribe": subscribe}})
+    
