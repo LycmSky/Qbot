@@ -79,5 +79,7 @@ class Filter:
                 return False if nodisturb["start"]<time<nodisturb["stop"] else True
             elif nodisturb["start"]>nodisturb["stop"]:
                 return False if nodisturb["start"]<time<1440 or 0<=time<nodisturb["stop"] else True
+            else:
+                return True
         else:
             return True
