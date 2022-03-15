@@ -14,7 +14,7 @@ from graia.ariadne.message.element import Image
 from graia.scheduler import timers
 from graia.ariadne.message.commander.saya import  CommandSchema
 from graia.ariadne.event.message import MessageEvent
-
+from graia.ariadne.message.commander import Arg
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
