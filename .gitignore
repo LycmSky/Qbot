@@ -131,4 +131,4 @@ dmypy.json
 .vscode
 poetry.lock
 pyproject.toml
-modules/ImageClassify/config.json
+modules/config.json
