@@ -1,5 +1,6 @@
-from turtle import pen
+import datetime
 import database
+from tools import timefomart
 
 mods = database.databaseInit('mods')
 
@@ -69,3 +70,14 @@ class Filter:
     def _admin(self):
         '''确认用户是否为该群管理员'''
         return True if str(self.event.sender.permission) != "MEMBER" else False
+
+    def nodisturb(uid):
+        if uid in mods.find_one({"name": "mblogSubscribe"})['nodisturb']:
+            nodisturb = mods.find_one({"name": "mblogSubscribe"})['nodisturb'][uid]
+            time = timefomart(datetime.datetime.now().strftime("%H:%M"))
+            if nodisturb["start"]<nodisturb["stop"]:
+                return False if nodisturb["start"]<time<nodisturb["stop"] else True
+            elif nodisturb["start"]>nodisturb["stop"]:
+                return False if nodisturb["start"]<time<1440 or 0<=time<nodisturb["stop"] else True
+        else:
+            return True

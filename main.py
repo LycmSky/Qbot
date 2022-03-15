@@ -1,6 +1,5 @@
 import asyncio
 import os, json
-
 from graia.ariadne.app import Ariadne
 from graia.ariadne.model import MiraiSession
 from graia.saya import Saya
