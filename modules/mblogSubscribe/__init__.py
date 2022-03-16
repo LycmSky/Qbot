@@ -154,9 +154,9 @@ async def control(open, close, nodisturb, add, delete, app: Ariadne, event:Messa
 
         if re.search(r'(\d+:\d+)-(\d+:\d+)', nodisturb) != None and filter(13): # 添加勿扰
             start, stop = re.search(r'(\d+:\d+)-(\d+:\d+)', nodisturb).groups()
-            nodisturb = mods.find_one({"name": "mblogSubscribe"})['nodisturb']
-            nodisturb[str(groupId)] = {"type": "group", "start": timefomart(start), "stop": timefomart(stop)}
-            mods.update_one({"name": "mblogSubscribe"}, {"$set": {"nodisturb": nodisturb}})
+            nodisturbData = mods.find_one({"name": "mblogSubscribe"})['nodisturb']
+            nodisturbData[str(groupId)] = {"type": "group", "start": timefomart(start), "stop": timefomart(stop)}
+            mods.update_one({"name": "mblogSubscribe"}, {"$set": {"nodisturb": nodisturbData}})
             await app.sendGroupMessage(groupId, MessageChain.create(f'已添加勿扰时段{nodisturb}'))
     # 处理好友消息
     if event.type=="FriendMessage":
