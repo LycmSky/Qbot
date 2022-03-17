@@ -58,6 +58,13 @@ def makemsg(okList, errList):
 {l}'''
     return message
 
+def selected(x: list):
+    for i in x:
+        if 'lastWeiboCard' in i:
+            return x.index(i)
+        else:
+            continue
+
 # 定时任务
 @channel.use(
     SchedulerSchema(timer=timers.every_minute()))
@@ -67,10 +74,11 @@ async def scheduled_func(app: Ariadne):
         session = get_running(Adapter).session
         async with session.get(mblogList) as r:
             imgBase = await r.json()
-            mblog = imgBase['data']['cards'][0]['mblog']
+            i = selected(imgBase['data']['cards'])
+            mblog = imgBase['data']['cards'][i]['mblog']
             text = re.sub(r'<[^>]+>', '', mblog['text'])
             screen_name = mblog['user']['screen_name']
-            scheme = imgBase['data']['cards'][0]['scheme']
+            scheme = imgBase['data']['cards'][i]['scheme']
             created_at = mblog['created_at']
             id = mblog['id']
 
