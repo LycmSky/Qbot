@@ -131,4 +131,4 @@ dmypy.json
 .vscode
 poetry.lock
 pyproject.toml
-modules/config.json
+config.json

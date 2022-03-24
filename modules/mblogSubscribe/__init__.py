@@ -86,7 +86,7 @@ async def scheduled_func(app: Ariadne):
                 for subscriber, t in subscribers.items():
                     blackList = mods.find_one({"name": "mblogSubscribe"})['blackList']
                     type = 'Groups' if t=="group" else 'Friends'
-                    x = False if subscriber in blackList[type] else True
+                    x = False if int(subscriber) in blackList[type] else True
                     if Filter.nodisturb(subscriber) and mods.find_one({"name": "mblogSubscribe"})["enabled"] and x:
                         send = app.sendGroupMessage if t=="group" else app.sendFriendMessage
                         response_header = header.format(datetime.strptime(created_at, '%a %b %d %H:%M:%S +0800 %Y'), screen_name, uid, text)
@@ -132,7 +132,6 @@ async def control(open, close, nodisturb, add, delete, app: Ariadne, event:Messa
         if close and filter(13): # 关闭
             if not blackList['Groups'].count(groupId):
                 blackList['Groups'].append(groupId)
-                print (blackList['Groups'])
                 await app.sendGroupMessage(groupId, MessageChain.create('已关闭微博订阅功能'))
 
         if add !="" and filter(13): # 订阅
