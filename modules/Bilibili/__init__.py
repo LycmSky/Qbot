@@ -1,5 +1,5 @@
 from modules.Weather.data import Command
-from tools import timefomart
+from public.tools import Bot
 from functools import reduce
 from graia.saya import Channel
 from graia.scheduler.saya import SchedulerSchema
@@ -23,6 +23,7 @@ from graia.saya.builtins.broadcast.schema import ListenerSchema
 from modules.Bilibili.get_info import API
 from graia.ariadne.message.element import Xml, App
 import ast
+
 # 获取插件实例，添加插件信息
 channel = Channel.current()
 channel.name("天气预报")
@@ -41,13 +42,14 @@ async def scheduled_func(app: Ariadne):
     ListenerSchema(
         listening_events = [GroupMessage, FriendMessage], 
         inline_dispatchers = [Twilight([ElementMatch(App)])]))
-async def twilight_handler(app: Ariadne, msg: MessageChain):
+async def twilight_handler(app: Ariadne, event: MessageEvent, msg: MessageChain):
+    bot = Bot(app, event)
     content = ast.literal_eval(msg.dict()['__root__'][1]['content'])
     if content['meta']['detail_1']['title'] == "哔哩哔哩":
         url = content['meta']['detail_1']['qqdocurl'].replace("\\", "")
         x = API()
         bvid = await x.get_bvid(url)
-        await app.sendFriendMessage(2417003944, MessageChain.create(await x.get_videoinfo(bvid)))
+        await bot.sendMessage(MessageChain.create(await x.get_videoinfo(bvid)))
 
 
 twilight = Twilight([
@@ -63,6 +65,5 @@ twilight = Twilight([
         listening_events = [GroupMessage, FriendMessage], 
         inline_dispatchers = [twilight]))
 async def twilight_handler(app: Ariadne, event: MessageEvent, inquiry: RegexResult):
-    x = API()
-    print (inquiry.result.asDisplay())
-    await app.sendFriendMessage(2417003944, MessageChain.create(await x.get_userinfo(inquiry.result.asDisplay())))
+    x, bot = API(), Bot(app, event)
+    await bot.sendMessage(MessageChain.create(await x.get_userinfo(inquiry.result.asDisplay())))
