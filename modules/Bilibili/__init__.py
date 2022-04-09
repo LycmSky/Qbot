@@ -72,12 +72,9 @@ async def twilight_handler(app: Ariadne, event: MessageEvent, inquiry: RegexResu
         if result[:2]=="BV" and len(result)==12:
             '''查询视频信息'''
             res = await x.get_videoinfo(result)
-        elif result[:2]=="cv" and result[2:].isdigit():
-            '''查询专栏信息'''
-            res = "专栏信息查询暂未完成，敬请期待"
         elif result[:2]=="ep" or result[:2]=="ss" and result[2:].isdigit():
             '''查询剧集信息'''
-            res = "剧集信息查询暂未完成，敬请期待"
+            res = await x.get_season(result)
         elif result[:2]=="au" and result[2:].isdigit():
             '''查询音频信息'''
             res = "音乐信息查询暂未完成，敬请期待"

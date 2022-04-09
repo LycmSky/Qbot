@@ -1,20 +1,22 @@
-from datetime import datetime
-import database
 import re
-from filter import Filter
-from public.tools import Time
+import datetime, time
 from functools import reduce
-from graia.saya import Channel
-from graia.scheduler.saya import SchedulerSchema
-from graia.ariadne.app import Ariadne
+
+import database
+from filter import Filter
 from graia.ariadne import get_running
 from graia.ariadne.adapter import Adapter
-from graia.ariadne.message.chain import MessageChain
-from graia.ariadne.message.element import Image
-from graia.scheduler import timers
-from graia.ariadne.message.commander.saya import  CommandSchema
+from graia.ariadne.app import Ariadne
 from graia.ariadne.event.message import MessageEvent
+from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.message.commander import Arg
+from graia.ariadne.message.commander.saya import CommandSchema
+from graia.ariadne.message.element import Image
+from graia.broadcast.exceptions import ExecutionStop
+from graia.saya import Channel
+from graia.scheduler import timers
+from graia.scheduler.saya import SchedulerSchema
+from public.tools import Time
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
@@ -58,13 +60,6 @@ def makemsg(okList, errList):
 {l}'''
     return message
 
-def selected(x: list):
-    for i in x:
-        if 'lastWeiboCard' in i:
-            return x.index(i)
-        else:
-            continue
-
 # 定时任务
 @channel.use(
     SchedulerSchema(timer=timers.every_minute()))
@@ -74,7 +69,8 @@ async def scheduled_func(app: Ariadne):
         session = get_running(Adapter).session
         async with session.get(mblogList) as r:
             imgBase = await r.json()
-            i = selected(imgBase['data']['cards'])
+            i = 0 if int(time.mktime(datetime.datetime.strptime(imgBase['data']['cards'][0]['mblog']['created_at'], '%a %b %d %H:%M:%S +0800 %Y').timetuple())) > \
+                int(time.mktime(datetime.datetime.strptime(imgBase['data']['cards'][1]['mblog']['created_at'], '%a %b %d %H:%M:%S +0800 %Y').timetuple())) else 1
             mblog = imgBase['data']['cards'][i]['mblog']
             text = re.sub(r'<[^>]+>', '', mblog['text'])
             screen_name = mblog['user']['screen_name']
@@ -89,7 +85,7 @@ async def scheduled_func(app: Ariadne):
                     x = False if int(subscriber) in blackList[type] else True
                     if Filter.nodisturb(subscriber) and mods.find_one({"name": "mblogSubscribe"})["enabled"] and x:
                         send = app.sendGroupMessage if t=="group" else app.sendFriendMessage
-                        response_header = header.format(datetime.strptime(created_at, '%a %b %d %H:%M:%S +0800 %Y'), screen_name, uid, text)
+                        response_header = header.format(datetime.datetime.strptime(created_at, '%a %b %d %H:%M:%S +0800 %Y'), screen_name, uid, text)
                         response_footer = footer.format(scheme)
                         if mblog['pic_num']:
                             MessageChain_pic = map(lambda x: MessageChain.create(Image(url=x['url'])), mblog['pics'])
