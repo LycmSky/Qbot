@@ -22,7 +22,7 @@ from graia.ariadne.message.parser.twilight import Twilight, FullMatch, ElementMa
 from graia.saya.builtins.broadcast.schema import ListenerSchema
 from modules.Bilibili.get_info import API
 from graia.ariadne.message.element import Xml, App
-import ast
+import json
 
 # 获取插件实例，添加插件信息
 channel = Channel.current()
@@ -44,7 +44,7 @@ async def scheduled_func(app: Ariadne):
         inline_dispatchers = [Twilight([ElementMatch(App)])]))
 async def twilight_handler(app: Ariadne, event: MessageEvent, msg: MessageChain):
     bot = Bot(app, event)
-    content = ast.literal_eval(msg.dict()['__root__'][1]['content'])
+    content = json.loads(msg.dict()['__root__'][1]['content'])
     if content['meta']['detail_1']['title'] == "哔哩哔哩":
         url = content['meta']['detail_1']['qqdocurl'].replace("\\", "")
         x = API()
@@ -66,4 +66,31 @@ twilight = Twilight([
         inline_dispatchers = [twilight]))
 async def twilight_handler(app: Ariadne, event: MessageEvent, inquiry: RegexResult):
     x, bot = API(), Bot(app, event)
-    await bot.sendMessage(MessageChain.create(await x.get_userinfo(inquiry.result.asDisplay())))
+    if inquiry.matched:
+        '''查询功能'''
+        result = inquiry.result.asDisplay()
+        if result[:2]=="BV" and len(result)==12:
+            '''查询视频信息'''
+            res = await x.get_videoinfo(result)
+        elif result[:2]=="cv" and result[2:].isdigit():
+            '''查询专栏信息'''
+            res = "专栏信息查询暂未完成，敬请期待"
+        elif result[:2]=="ep" or result[:2]=="ss" and result[2:].isdigit():
+            '''查询剧集信息'''
+            res = "剧集信息查询暂未完成，敬请期待"
+        elif result[:2]=="au" and result[2:].isdigit():
+            '''查询音频信息'''
+            res = "音乐信息查询暂未完成，敬请期待"
+        elif result.isdigit():
+            '''查询用户信息'''
+            res = await x.get_userinfo(result)
+        else:
+            res = (
+                "无法识别，请检查输入是否正确\n"
+                "此命令支持查询以下信息：\n"
+                "    用户信息 --> uid\n"
+                "    视频信息 --> BV号\n"
+                "    剧集信息 --> epid或ssid\n"
+                "    专栏信息 --> cvid"
+            )
+        await bot.sendMessage(MessageChain.create(res))

@@ -2,7 +2,7 @@ from datetime import datetime
 import database
 import re
 from filter import Filter
-from public.tools import timefomart
+from public.tools import Time
 from functools import reduce
 from graia.saya import Channel
 from graia.scheduler.saya import SchedulerSchema
@@ -162,7 +162,7 @@ async def control(open, close, nodisturb, add, delete, app: Ariadne, event:Messa
         if re.search(r'(\d+:\d+)-(\d+:\d+)', nodisturb) != None and filter(13): # 添加勿扰
             start, stop = re.search(r'(\d+:\d+)-(\d+:\d+)', nodisturb).groups()
             nodisturbData = mods.find_one({"name": "mblogSubscribe"})['nodisturb']
-            nodisturbData[str(groupId)] = {"type": "group", "start": timefomart(start), "stop": timefomart(stop)}
+            nodisturbData[str(groupId)] = {"type": "group", "start": Time.timefomart(start), "stop": Time.timefomart(stop)}
             mods.update_one({"name": "mblogSubscribe"}, {"$set": {"nodisturb": nodisturbData}})
             await app.sendGroupMessage(groupId, MessageChain.create(f'已添加勿扰时段{nodisturb}'))
     # 处理好友消息
@@ -207,7 +207,7 @@ async def control(open, close, nodisturb, add, delete, app: Ariadne, event:Messa
         if re.search(r'(\d+:\d+)-(\d+:\d+)', nodisturb) != None and filter(12): # 添加勿扰
             start, stop = re.search(r'(\d+:\d+)-(\d+:\d+)', nodisturb).groups()
             nodisturbData = mods.find_one({"name": "mblogSubscribe"})['nodisturb']
-            nodisturbData[str(senderId)] = {"type": "friend", "start": timefomart(start), "stop": timefomart(stop)}
+            nodisturbData[str(senderId)] = {"type": "friend", "start": Time.timefomart(start), "stop": Time.timefomart(stop)}
             mods.update_one({"name": "mblogSubscribe"}, {"$set": {"nodisturb": nodisturbData}})
             await app.sendFriendMessage(senderId, MessageChain.create(f'已添加勿扰时段:{nodisturb}'))
 

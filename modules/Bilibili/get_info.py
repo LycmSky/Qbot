@@ -1,4 +1,5 @@
 from typing import Dict
+from public.tools import Time
 import aiohttp
 import re
 
@@ -16,11 +17,23 @@ class API:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as res:
                 info =  await res.json()
-                return f"Bilibili视频解析：\n"\
-                       f"标题：{info['data']['title']}\n"\
-                       f"UP主：{info['data']['owner']['name']}\n\n"\
+                desc = info['data']['desc'].replace("\n", "\n    ")
+                if info["code"]!=0:
+                    return "获取失败"
+                return f"视频标题：\n"\
+                       f"    {info['data']['title']}\n"\
+                       f"\n发布时间：\n"\
+                       f"    {await Time.stamp_to_date(info['data']['pubdate'])}\n"\
+                       f"\n其他信息：\n"\
+                       f"    UP主：{info['data']['owner']['name']}\n"\
+                       f"    分P数量：{info['data']['videos']}\n"\
+                       f"    视频时长：{await Time.stamp_to_duration(info['data']['duration'])}\n"\
+                       f"    视频分区：{info['data']['tname']}\n"\
+                       f"    BV号：{info['data']['bvid']}\n"\
+                       f"\n视频简介：\n"\
+                       f"    {desc}\n"\
+                       f"\n视频链接：\n"\
                        f"https://www.bilibili.com/video/{bvid}"
-
 
     async def get_bvid(self, url: str) -> str:
         '''
@@ -54,6 +67,8 @@ class API:
         async with aiohttp.ClientSession() as session:
             async with session.get(url_info) as response_info:
                 info =  await response_info.json()
+                if info["code"]!=0:
+                    return f"uid:{uid},查无此人"
             async with session.get(url_navnum) as response_navnum:
                 navnum =  await response_navnum.json()
 
