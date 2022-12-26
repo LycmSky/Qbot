@@ -1,5 +1,5 @@
 from modules.Weather.data import Command
-from public.tools import Bot
+from public.ariadne import Bot
 from functools import reduce
 from graia.saya import Channel
 from graia.scheduler.saya import SchedulerSchema
